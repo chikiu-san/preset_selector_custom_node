@@ -1,0 +1,179 @@
+import os
+import folder_paths
+import comfy.sd
+import comfy.utils
+
+
+class PresetSelector10:
+    """
+    Select 1 preset out of 10 and apply:
+    - one HIGH LoRA to a copy of the base model
+    - one LOW LoRA to a copy of the base model
+    - positive / negative prompt encoding using the provided CLIP
+
+    Notes:
+    - preset_index is wrapped with modulo 10, so 10 -> 0, 11 -> 1, etc.
+    - LoRA names are plain strings. Use the exact filename as it appears in your loras folder,
+      for example: my_lora.safetensors
+    - Blank LoRA name means "do not apply a LoRA" for that slot.
+    """
+
+    CATEGORY = "presets"
+    RETURN_TYPES = ("MODEL", "MODEL", "CONDITIONING", "CONDITIONING", "INT", "STRING")
+    RETURN_NAMES = ("high_model", "low_model", "positive", "negative", "selected_index", "selected_name")
+    FUNCTION = "select_preset"
+
+    _lora_cache = {}
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        required = {
+            "model": ("MODEL",),
+            "clip": ("CLIP",),
+            "preset_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
+        }
+
+        for i in range(10):
+            required[f"preset_{i}_name"] = (
+                "STRING",
+                {"default": f"Preset {i}", "multiline": False},
+            )
+            required[f"preset_{i}_high_lora"] = (
+                "STRING",
+                {"default": "", "multiline": False},
+            )
+            required[f"preset_{i}_high_strength"] = (
+                "FLOAT",
+                {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
+            )
+            required[f"preset_{i}_low_lora"] = (
+                "STRING",
+                {"default": "", "multiline": False},
+            )
+            required[f"preset_{i}_low_strength"] = (
+                "FLOAT",
+                {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
+            )
+            required[f"preset_{i}_positive"] = (
+                "STRING",
+                {"default": "", "multiline": True, "dynamicPrompts": False},
+            )
+            required[f"preset_{i}_negative"] = (
+                "STRING",
+                {"default": "", "multiline": True, "dynamicPrompts": False},
+            )
+
+        return {"required": required}
+
+    @classmethod
+    def _resolve_lora_path(cls, lora_name: str):
+        if not lora_name:
+            return None
+
+        lora_name = lora_name.strip()
+        if not lora_name:
+            return None
+
+        if os.path.isabs(lora_name) and os.path.exists(lora_name):
+            return lora_name
+
+        direct_path = folder_paths.get_full_path("loras", lora_name)
+        if direct_path is not None:
+            return direct_path
+
+        # fallback: allow basename match if user pasted a path-like or mismatched relative string
+        target_base = os.path.basename(lora_name)
+        for available in folder_paths.get_filename_list("loras"):
+            if os.path.basename(available) == target_base:
+                path = folder_paths.get_full_path("loras", available)
+                if path is not None:
+                    return path
+
+        raise ValueError(
+            f"LoRA not found: '{lora_name}'. Use the exact filename from your loras folder."
+        )
+
+    @classmethod
+    def _load_lora_file(cls, lora_name: str):
+        path = cls._resolve_lora_path(lora_name)
+        if path is None:
+            return None
+
+        if path in cls._lora_cache:
+            return cls._lora_cache[path]
+
+        lora = comfy.utils.load_torch_file(path, safe_load=True)
+        cls._lora_cache[path] = lora
+        return lora
+
+    @classmethod
+    def _apply_single_lora(cls, model, clip, lora_name: str, strength: float):
+        if lora_name is None or str(lora_name).strip() == "" or abs(float(strength)) < 1e-12:
+            return model
+
+        lora_data = cls._load_lora_file(lora_name)
+        model_lora, _clip_unused = comfy.sd.load_lora_for_models(model, clip, lora_data, float(strength), 0.0)
+        return model_lora
+
+    @staticmethod
+    def _encode_text(clip, text: str):
+        text = "" if text is None else str(text)
+        tokens = clip.tokenize(text)
+        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
+        return [[cond, {"pooled_output": pooled}]]
+
+    def select_preset(self, model, clip, preset_index, **kwargs):
+        idx = int(preset_index) % 10
+
+        name = kwargs.get(f"preset_{idx}_name", f"Preset {idx}")
+        high_lora = kwargs.get(f"preset_{idx}_high_lora", "")
+        high_strength = kwargs.get(f"preset_{idx}_high_strength", 1.0)
+        low_lora = kwargs.get(f"preset_{idx}_low_lora", "")
+        low_strength = kwargs.get(f"preset_{idx}_low_strength", 1.0)
+        positive = kwargs.get(f"preset_{idx}_positive", "")
+        negative = kwargs.get(f"preset_{idx}_negative", "")
+
+        high_model = self._apply_single_lora(model, clip, high_lora, high_strength)
+        low_model = self._apply_single_lora(model, clip, low_lora, low_strength)
+        positive_cond = self._encode_text(clip, positive)
+        negative_cond = self._encode_text(clip, negative)
+
+        return (high_model, low_model, positive_cond, negative_cond, idx, str(name))
+
+
+class Modulo10:
+    """
+    Small helper node. Useful if you want to feed a continuously incrementing INT
+    into the preset selector while keeping the effective preset range at 0..9.
+    """
+
+    CATEGORY = "presets"
+    RETURN_TYPES = ("INT", "STRING")
+    RETURN_NAMES = ("preset_index", "preset_label")
+    FUNCTION = "wrap"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
+            }
+        }
+
+    def wrap(self, index):
+        idx = int(index) % 10
+        return (idx, f"Preset {idx}")
+
+
+# Note: the mapping keys are the internal node IDs referenced by saved workflows.
+# They were renamed from the old "Igoon*" IDs, so workflows saved with the previous
+# version will show these nodes as missing and need to be re-added.
+NODE_CLASS_MAPPINGS = {
+    "PresetSelector10": PresetSelector10,
+    "Modulo10": Modulo10,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "PresetSelector10": "Preset Selector 10",
+    "Modulo10": "Modulo 10",
+}
