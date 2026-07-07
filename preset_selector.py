@@ -13,9 +13,8 @@ class PresetSelector10:
 
     Notes:
     - preset_index is wrapped with modulo 10, so 10 -> 0, 11 -> 1, etc.
-    - LoRA names are plain strings. Use the exact filename as it appears in your loras folder,
-      for example: my_lora.safetensors
-    - Blank LoRA name means "do not apply a LoRA" for that slot.
+    - The HIGH / LOW LoRA slots are dropdowns populated from your ComfyUI loras folder.
+      Pick "None" to skip the LoRA for that slot.
     """
 
     CATEGORY = "presets"
@@ -27,10 +26,16 @@ class PresetSelector10:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # Dropdown choices populated from the ComfyUI loras folder (e.g. MimicPC's
+        # models/loras). "None" is prepended so a slot can be left empty.
+        lora_options = ["None"] + folder_paths.get_filename_list("loras")
+
         required = {
             "model": ("MODEL",),
             "clip": ("CLIP",),
-            "preset_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
+            # control_after_generate adds the fixed/increment/decrement/randomize
+            # dropdown so preset_index can auto-advance each queue run.
+            "preset_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1, "control_after_generate": True}),
         }
 
         for i in range(10):
@@ -38,18 +43,12 @@ class PresetSelector10:
                 "STRING",
                 {"default": f"Preset {i}", "multiline": False},
             )
-            required[f"preset_{i}_high_lora"] = (
-                "STRING",
-                {"default": "", "multiline": False},
-            )
+            required[f"preset_{i}_high_lora"] = (lora_options,)
             required[f"preset_{i}_high_strength"] = (
                 "FLOAT",
                 {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
             )
-            required[f"preset_{i}_low_lora"] = (
-                "STRING",
-                {"default": "", "multiline": False},
-            )
+            required[f"preset_{i}_low_lora"] = (lora_options,)
             required[f"preset_{i}_low_strength"] = (
                 "FLOAT",
                 {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.05},
@@ -71,7 +70,7 @@ class PresetSelector10:
             return None
 
         lora_name = lora_name.strip()
-        if not lora_name:
+        if not lora_name or lora_name == "None":
             return None
 
         if os.path.isabs(lora_name) and os.path.exists(lora_name):
@@ -108,10 +107,11 @@ class PresetSelector10:
 
     @classmethod
     def _apply_single_lora(cls, model, clip, lora_name: str, strength: float):
-        if lora_name is None or str(lora_name).strip() == "" or abs(float(strength)) < 1e-12:
+        name = "" if lora_name is None else str(lora_name).strip()
+        if name in ("", "None") or abs(float(strength)) < 1e-12:
             return model
 
-        lora_data = cls._load_lora_file(lora_name)
+        lora_data = cls._load_lora_file(name)
         model_lora, _clip_unused = comfy.sd.load_lora_for_models(model, clip, lora_data, float(strength), 0.0)
         return model_lora
 
@@ -126,9 +126,9 @@ class PresetSelector10:
         idx = int(preset_index) % 10
 
         name = kwargs.get(f"preset_{idx}_name", f"Preset {idx}")
-        high_lora = kwargs.get(f"preset_{idx}_high_lora", "")
+        high_lora = kwargs.get(f"preset_{idx}_high_lora", "None")
         high_strength = kwargs.get(f"preset_{idx}_high_strength", 1.0)
-        low_lora = kwargs.get(f"preset_{idx}_low_lora", "")
+        low_lora = kwargs.get(f"preset_{idx}_low_lora", "None")
         low_strength = kwargs.get(f"preset_{idx}_low_strength", 1.0)
         positive = kwargs.get(f"preset_{idx}_positive", "")
         negative = kwargs.get(f"preset_{idx}_negative", "")
@@ -156,7 +156,7 @@ class Modulo10:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
+                "index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1, "control_after_generate": True}),
             }
         }
 

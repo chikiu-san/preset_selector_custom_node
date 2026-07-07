@@ -58,8 +58,8 @@ can switch between full setups with a single integer.
 
 ## Notes
 
-- Leave a LoRA name blank to skip the LoRA for that slot.
-- LoRA names must be the exact filename in your `loras` folder, e.g. `example.safetensors`.
+- The HIGH / LOW LoRA fields are dropdowns populated from your ComfyUI `loras` folder (e.g. MimicPC's `models/loras`). Pick **None** to skip the LoRA for that slot.
+- The dropdown list is read when ComfyUI loads. After adding files to `models/loras`, restart ComfyUI (or reload the node) to see them.
 
 ## License
 
