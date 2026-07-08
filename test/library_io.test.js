@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadLibrary, saveLibrary, upsertEntry, LIB } from "../web/library_io.js";
+import { loadLibrary, saveLibrary, upsertEntry, upsertMany, LIB } from "../web/library_io.js";
 
 // Fake ComfyUI userdata api backed by a Map, faithfully honoring options.stringify
 // EXACTLY like ComfyUI: the body is JSON.stringify(data) only when stringify is
@@ -53,4 +53,53 @@ test("upsertEntry aborts (does not wipe) when the existing library can't be read
 test("loadLibrary returns empty on 404", async () => {
   const api = makeApi();
   assert.deepEqual(await loadLibrary(api), { version: 1, entries: [] });
+});
+
+test("upsertMany writes multiple new entries in a single save", async () => {
+  const api = makeApi();
+  let saves = 0;
+  const orig = api.storeUserData.bind(api);
+  api.storeUserData = async (...a) => { saves++; return orig(...a); };
+  const res = await upsertMany(api, [
+    { high_lora: "h1", low_lora: "l1", positive: "a" },
+    { high_lora: "h2", low_lora: "l2", positive: "b" },
+  ]);
+  assert.equal(res.ok, true);
+  assert.equal(saves, 1); // one round-trip, not one-per-entry
+  assert.equal((await loadLibrary(api)).entries.length, 2);
+});
+
+test("upsertMany overwrites existing pairs and appends new ones in one pass", async () => {
+  const api = makeApi();
+  await upsertMany(api, [{ high_lora: "h", low_lora: "l", positive: "old" }]);
+  await upsertMany(api, [
+    { high_lora: "h", low_lora: "l", positive: "new" },
+    { high_lora: "h2", low_lora: "l2", positive: "b" },
+  ]);
+  const entries = (await loadLibrary(api)).entries;
+  assert.equal(entries.length, 2);
+  assert.equal(entries.find((e) => e.high_lora === "h").positive, "new");
+});
+
+test("upsertMany last-wins on duplicate pairs within the batch", async () => {
+  const api = makeApi();
+  await upsertMany(api, [
+    { high_lora: "h", low_lora: "l", positive: "first" },
+    { high_lora: "h", low_lora: "l", positive: "second" },
+  ]);
+  const entries = (await loadLibrary(api)).entries;
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].positive, "second");
+});
+
+test("upsertMany aborts (does not wipe) when the existing library can't be read", async () => {
+  const api = makeApi();
+  await upsertMany(api, [{ high_lora: "h", low_lora: "l", positive: "keep" }]);
+  api.getUserData = async () => new Response(null, { status: 503 });
+  const res = await upsertMany(api, [{ high_lora: "h2", low_lora: "l2", positive: "new" }]);
+  assert.equal(res.aborted, true);
+  assert.equal(res.ok, false);
+  const doc = JSON.parse(api.store.get(LIB));
+  assert.equal(doc.entries.length, 1);
+  assert.equal(doc.entries[0].positive, "keep");
 });

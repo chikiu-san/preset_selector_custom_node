@@ -61,3 +61,20 @@ export async function upsertEntry(api, entry) {
   const ok = await saveLibrary(api, { version: 1, entries: upsert(doc.entries, entry) });
   return { ok, aborted: false };
 }
+
+// Upserts every entry in `entries` (each keyed by its (high_lora, low_lora) pair) in ONE
+// round-trip: strict load (so a failed read aborts instead of wiping), fold all in with
+// `upsert`, then one save. Duplicate pairs within `entries`: last wins. Returns {ok, aborted}.
+export async function upsertMany(api, entries) {
+  let doc;
+  try {
+    doc = await loadLibrary(api, { strict: true });
+  } catch (e) {
+    console.warn("[PresetLibrary] save aborted — could not read existing library (not overwriting)", e);
+    return { ok: false, aborted: true };
+  }
+  let list = doc.entries;
+  for (const entry of entries) list = upsert(list, entry);
+  const ok = await saveLibrary(api, { version: 1, entries: list });
+  return { ok, aborted: false };
+}
