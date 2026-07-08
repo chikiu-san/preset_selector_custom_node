@@ -1,0 +1,9 @@
+{
+  "name": "preset-selector-custom-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/library_core.test.js"
+  }
+}
