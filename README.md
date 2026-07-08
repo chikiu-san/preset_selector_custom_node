@@ -28,6 +28,10 @@ can switch between full setups with a single integer.
 ## Usage
 
 - Connect the base **MODEL** and **CLIP** into **Preset Selector 10**.
+- *(Optional)* Connect a second base model to **`model_low`**. When connected, the LOW LoRA is
+  applied to `model_low` (and the HIGH LoRA to `model`); when left unconnected, both LoRAs apply
+  to `model` as before. This lets one node drive two different base models — see
+  [Dual base models](#dual-base-models-wan-22) below.
 - Set `preset_index`.
 - Fill the `preset_0` … `preset_9` fields.
 
@@ -112,6 +116,26 @@ Option B — manual: place this folder under ComfyUI's `custom_nodes/` (clone or
 - Node missing after install → confirm you restarted ComfyUI, and check the Manager log for errors.
 - Auto-fill does nothing → you haven't 💾-saved that exact `(high_lora, low_lora)` pair yet
   (an unsaved pair leaving the widgets untouched is expected behavior).
+
+## Dual base models (Wan 2.2)
+
+Wan 2.2 denoises in two stages that use two different base UNet models (high-noise and
+low-noise), each needing its own LoRA. Connect the optional `model_low` input so a **single**
+Preset Selector 10 drives both:
+
+```
+high-noise base ─→ model       ┐
+low-noise base  ─→ model_low   ┤ Preset Selector 10 → high_model → high-noise sampler
+                               │                     → low_model  → low-noise sampler
+                               └                     → positive / negative → your conditioning
+```
+
+- `high_model = model + high_lora`
+- `low_model = model_low + low_lora` (falls back to `model` if `model_low` is unconnected)
+- One prompt, one preset slot, `preset_index` cycling — all as usual.
+
+Each preset slot bundles a character's `_HIGH` and `_LOW` LoRA files as one pair, so selecting a
+slot applies the right LoRA to each base model.
 
 ## License
 

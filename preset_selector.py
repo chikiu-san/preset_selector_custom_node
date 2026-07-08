@@ -17,6 +17,8 @@ class PresetSelector10:
     - preset_index is wrapped with modulo 10, so 10 -> 0, 11 -> 1, etc.
     - The HIGH / LOW LoRA slots are dropdowns populated from your ComfyUI loras folder.
       Pick "None" to skip the LoRA for that slot.
+    - Connect the optional "model_low" input to apply the LOW LoRA to a second base model
+      (e.g. Wan 2.2's low-noise model); it falls back to "model" when unconnected.
     """
 
     CATEGORY = "presets"
