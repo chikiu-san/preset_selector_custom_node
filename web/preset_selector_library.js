@@ -18,6 +18,7 @@ async function autofillSlot(node, i) {
   const high = slotWidget(node, i, "high_lora");
   const low = slotWidget(node, i, "low_lora");
   if (!high || !low) return;
+  if (high.value === "None" && low.value === "None") return; // empty pair -> no lookup
   const doc = await loadLibrary(api);
   const entry = find(doc.entries, high.value, low.value);
   if (!entry) return; // no match -> leave this slot untouched
