@@ -8,6 +8,7 @@ can switch between full setups with a single integer.
 
 - **Preset Selector 10** — pick 1 of 10 presets and output the LoRA-applied models and encoded conditioning.
 - **Modulo 10** — small helper that wraps an incrementing INT into the 0–9 range.
+- **Preset Library Selector** — *planned (designed, not yet implemented)*. Pick a HIGH+LOW LoRA pair and auto-load its saved prompt from a persistent library. See [Planned](#planned-preset-library-selector) below.
 
 ## Files
 
@@ -60,6 +61,24 @@ can switch between full setups with a single integer.
 
 - The HIGH / LOW LoRA fields are dropdowns populated from your ComfyUI `loras` folder (e.g. MimicPC's `models/loras`). Pick **None** to skip the LoRA for that slot.
 - The dropdown list is read when ComfyUI loads. After adding files to `models/loras`, restart ComfyUI (or reload the node) to see them.
+
+## Planned: Preset Library Selector
+
+> **Status:** designed, **not yet implemented**. Full design:
+> [`docs/superpowers/specs/2026-07-08-preset-library-selector-design.md`](docs/superpowers/specs/2026-07-08-preset-library-selector-design.md).
+
+A new node that flips the model from *index-based fixed slots* to a **persistent
+LoRA → prompt library**, so prompts don't have to be re-typed across workflows or when
+switching LoRAs:
+
+- Pick a `high_lora` + `low_lora` pair via dropdowns.
+- The matching positive / negative prompt (and strengths) **auto-loads** from a persistent
+  `preset_library.json`, keyed by the `(high_lora, low_lora)` pair.
+- Loaded values stay **editable in place**; a **💾 Save to library** button upserts your
+  current values back into the library.
+- At run time the node uses the **on-screen (edited) values** — what you see is what runs.
+
+The existing **Preset Selector 10** node is left untouched.
 
 ## License
 
