@@ -73,7 +73,8 @@ switching LoRAs:
 
 - Pick a `high_lora` + `low_lora` pair via dropdowns.
 - The matching positive / negative prompt (and strengths) **auto-loads** from a persistent
-  `preset_library.json`, keyed by the `(high_lora, low_lora)` pair.
+  library file stored in ComfyUI's user data (via ComfyUI's built-in userdata API, so it
+  survives node updates and persists on MimicPC), keyed by the `(high_lora, low_lora)` pair.
 - Loaded values stay **editable in place**; a **💾 Save to library** button upserts your
   current values back into the library.
 - At run time the node uses the **on-screen (edited) values** — what you see is what runs.
