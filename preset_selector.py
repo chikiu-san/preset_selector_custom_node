@@ -1,7 +1,9 @@
-import os
 import folder_paths
-import comfy.sd
-import comfy.utils
+
+try:
+    from . import lora_utils
+except ImportError:  # allow standalone import for tests
+    import lora_utils
 
 
 class PresetSelector10:
@@ -21,8 +23,6 @@ class PresetSelector10:
     RETURN_TYPES = ("MODEL", "MODEL", "CONDITIONING", "CONDITIONING", "INT", "STRING")
     RETURN_NAMES = ("high_model", "low_model", "positive", "negative", "selected_index", "selected_name")
     FUNCTION = "select_preset"
-
-    _lora_cache = {}
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -64,64 +64,6 @@ class PresetSelector10:
 
         return {"required": required}
 
-    @classmethod
-    def _resolve_lora_path(cls, lora_name: str):
-        if not lora_name:
-            return None
-
-        lora_name = lora_name.strip()
-        if not lora_name or lora_name == "None":
-            return None
-
-        if os.path.isabs(lora_name) and os.path.exists(lora_name):
-            return lora_name
-
-        direct_path = folder_paths.get_full_path("loras", lora_name)
-        if direct_path is not None:
-            return direct_path
-
-        # fallback: allow basename match if user pasted a path-like or mismatched relative string
-        target_base = os.path.basename(lora_name)
-        for available in folder_paths.get_filename_list("loras"):
-            if os.path.basename(available) == target_base:
-                path = folder_paths.get_full_path("loras", available)
-                if path is not None:
-                    return path
-
-        raise ValueError(
-            f"LoRA not found: '{lora_name}'. Use the exact filename from your loras folder."
-        )
-
-    @classmethod
-    def _load_lora_file(cls, lora_name: str):
-        path = cls._resolve_lora_path(lora_name)
-        if path is None:
-            return None
-
-        if path in cls._lora_cache:
-            return cls._lora_cache[path]
-
-        lora = comfy.utils.load_torch_file(path, safe_load=True)
-        cls._lora_cache[path] = lora
-        return lora
-
-    @classmethod
-    def _apply_single_lora(cls, model, clip, lora_name: str, strength: float):
-        name = "" if lora_name is None else str(lora_name).strip()
-        if name in ("", "None") or abs(float(strength)) < 1e-12:
-            return model
-
-        lora_data = cls._load_lora_file(name)
-        model_lora, _clip_unused = comfy.sd.load_lora_for_models(model, clip, lora_data, float(strength), 0.0)
-        return model_lora
-
-    @staticmethod
-    def _encode_text(clip, text: str):
-        text = "" if text is None else str(text)
-        tokens = clip.tokenize(text)
-        cond, pooled = clip.encode_from_tokens(tokens, return_pooled=True)
-        return [[cond, {"pooled_output": pooled}]]
-
     def select_preset(self, model, clip, preset_index, **kwargs):
         idx = int(preset_index) % 10
 
@@ -133,10 +75,10 @@ class PresetSelector10:
         positive = kwargs.get(f"preset_{idx}_positive", "")
         negative = kwargs.get(f"preset_{idx}_negative", "")
 
-        high_model = self._apply_single_lora(model, clip, high_lora, high_strength)
-        low_model = self._apply_single_lora(model, clip, low_lora, low_strength)
-        positive_cond = self._encode_text(clip, positive)
-        negative_cond = self._encode_text(clip, negative)
+        high_model = lora_utils.apply_single_lora(model, clip, high_lora, high_strength)
+        low_model = lora_utils.apply_single_lora(model, clip, low_lora, low_strength)
+        positive_cond = lora_utils.encode_text(clip, positive)
+        negative_cond = lora_utils.encode_text(clip, negative)
 
         return (high_model, low_model, positive_cond, negative_cond, idx, str(name))
 
