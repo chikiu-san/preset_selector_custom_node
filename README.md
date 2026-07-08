@@ -89,6 +89,43 @@ re-type prompts across workflows or when switching LoRAs.
 No-match behavior: choosing a pair with no saved entry leaves the widgets unchanged — type
 a prompt and press 💾 to create it. Loading a saved workflow never overwrites its prompts.
 
+## Using on MimicPC
+
+MimicPC runs stock ComfyUI (plus ComfyUI Manager) in the browser, so install and usage are
+the same as any ComfyUI. Two things are MimicPC-specific: LoRAs are read from
+`Storage > models > loras` (persistent), and this node's library JSON lives in ComfyUI's
+`user/` directory — the same persistent area as saved workflows — so **your presets survive
+instance restarts and node updates.**
+
+**Prerequisites**
+- A ComfyUI app running on MimicPC.
+- Your LoRA files uploaded to `Storage > models > loras` (the dropdowns read from there).
+
+**Install**
+
+Option A — ComfyUI Manager (recommended):
+1. In ComfyUI, open **Manager → Install via Git URL**.
+2. Paste `https://github.com/chikiu-san/preset_selector_custom_node` and click **Install**.
+3. **Restart the ComfyUI app.**
+
+Option B — manual: place this folder under ComfyUI's `custom_nodes/` (clone or upload), then restart.
+
+**Use it**
+1. Right-click the canvas → **Add Node → presets → Preset Library Selector** (or double-click and search).
+2. Connect **MODEL** and **CLIP** (from your checkpoint loader). Use whichever of `high_model` /
+   `low_model` you need; set an unused LoRA slot to `None`.
+3. Pick `high_lora` + `low_lora`. For a new pair, type `positive` / `negative` (and optionally
+   `label` and the strengths), then click **💾 Save to library**.
+4. Next time — in any workflow — just pick the same pair and the saved prompt / strengths / label
+   **auto-fill**. Tweak in place; press 💾 again to update the entry.
+
+**Notes & troubleshooting**
+- The LoRA dropdowns are read at ComfyUI startup — after adding files to `models/loras`, restart to see them.
+- The library persists at `user/preset_selector_library.json` on MimicPC (survives restarts and node updates).
+- Node missing after install → confirm you restarted ComfyUI, and check the Manager log for errors.
+- Auto-fill does nothing → you haven't 💾-saved that exact `(high_lora, low_lora)` pair yet
+  (an unsaved pair leaving the widgets untouched is expected behavior).
+
 ## License
 
 [MIT](LICENSE)
