@@ -62,9 +62,9 @@ class PresetSelector10:
                 {"default": "", "multiline": True, "dynamicPrompts": False},
             )
 
-        return {"required": required}
+        return {"required": required, "optional": {"model_low": ("MODEL",)}}
 
-    def select_preset(self, model, clip, preset_index, **kwargs):
+    def select_preset(self, model, clip, preset_index, model_low=None, **kwargs):
         idx = int(preset_index) % 10
 
         name = kwargs.get(f"preset_{idx}_name", f"Preset {idx}")
@@ -76,7 +76,8 @@ class PresetSelector10:
         negative = kwargs.get(f"preset_{idx}_negative", "")
 
         high_model = lora_utils.apply_single_lora(model, clip, high_lora, high_strength)
-        low_model = lora_utils.apply_single_lora(model, clip, low_lora, low_strength)
+        low_base = model if model_low is None else model_low
+        low_model = lora_utils.apply_single_lora(low_base, clip, low_lora, low_strength)
         positive_cond = lora_utils.encode_text(clip, positive)
         negative_cond = lora_utils.encode_text(clip, negative)
 
