@@ -1,5 +1,5 @@
 // Pure, dependency-free helpers over the preset library entry array.
-// Loaded in-browser by preset_library.js AND imported by Node's test runner.
+// Loaded in-browser by preset_selector_library.js AND imported by Node's test runner.
 
 function asList(entries) {
   return Array.isArray(entries) ? entries : [];

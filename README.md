@@ -6,9 +6,8 @@ can switch between full setups with a single integer.
 
 ## Nodes
 
-- **Preset Selector 10** — pick 1 of 10 presets and output the LoRA-applied models and encoded conditioning.
+- **Preset Selector 10** — pick 1 of 10 presets and output the LoRA-applied models and encoded conditioning. Each slot's `(high_lora, low_lora)` pair can auto-load its prompt from a persistent library and be saved back with one button — see [Library persistence](#library-persistence) below.
 - **Modulo 10** — small helper that wraps an incrementing INT into the 0–9 range.
-- **Preset Library Selector** — pick a HIGH+LOW LoRA pair; the matching prompt (and strengths) auto-loads from a persistent per-user library, editable in place, with a 💾 Save button. See [Preset Library Selector](#preset-library-selector) below.
 
 ## Files
 
@@ -62,32 +61,20 @@ can switch between full setups with a single integer.
 - The HIGH / LOW LoRA fields are dropdowns populated from your ComfyUI `loras` folder (e.g. MimicPC's `models/loras`). Pick **None** to skip the LoRA for that slot.
 - The dropdown list is read when ComfyUI loads. After adding files to `models/loras`, restart ComfyUI (or reload the node) to see them.
 
-## Preset Library Selector
+## Library persistence
 
-Pick a `high_lora` + `low_lora` pair and the matching preset auto-loads, so you don't
-re-type prompts across workflows or when switching LoRAs.
+Each of the 10 slots can auto-load its prompt from — and save it to — a persistent per-user
+library keyed by the slot's `(high_lora, low_lora)` pair, so you don't re-type prompts across
+workflows.
 
-- Selecting either LoRA dropdown auto-fills `label` / `positive` / `negative` and both
-  strengths from a persistent library keyed by the `(high_lora, low_lora)` pair.
-- Loaded values are **editable in place**; execution uses the on-screen values
-  (what you see is what runs).
-- **💾 Save to library** upserts the current values back into the library.
-- The library is stored via ComfyUI's built-in userdata API as
-  `preset_selector_library.json` in ComfyUI's user directory, so it survives node updates
-  and persists on MimicPC.
-
-### Outputs
-
-| Output | Description |
-|--------|-------------|
-| `high_model` | Base model with the HIGH LoRA applied |
-| `low_model` | Base model with the LOW LoRA applied |
-| `positive` | Encoded positive conditioning (from the on-screen text) |
-| `negative` | Encoded negative conditioning (from the on-screen text) |
-| `selected_label` | Echoes the current `label` widget |
-
-No-match behavior: choosing a pair with no saved entry leaves the widgets unchanged — type
-a prompt and press 💾 to create it. Loading a saved workflow never overwrites its prompts.
+- Changing a slot's `high_lora` / `low_lora` auto-fills that slot's `positive` / `negative` /
+  strengths / name from the library (if that pair was saved). No saved entry → the slot is left
+  unchanged. Opening a saved workflow never overwrites its slots.
+- **💾 Save all slots to library** upserts every slot that has a LoRA pair (skipping empty
+  `None`/`None` slots) back into the library in one write.
+- Loaded values are **editable in place**; execution uses the on-screen values (what you see is
+  what runs). The library is stored via ComfyUI's userdata API as `preset_selector_library.json`
+  in ComfyUI's user directory, so it survives node updates and persists on MimicPC.
 
 ## Using on MimicPC
 
@@ -111,13 +98,13 @@ Option A — ComfyUI Manager (recommended):
 Option B — manual: place this folder under ComfyUI's `custom_nodes/` (clone or upload), then restart.
 
 **Use it**
-1. Right-click the canvas → **Add Node → presets → Preset Library Selector** (or double-click and search).
-2. Connect **MODEL** and **CLIP** (from your checkpoint loader). Use whichever of `high_model` /
-   `low_model` you need; set an unused LoRA slot to `None`.
-3. Pick `high_lora` + `low_lora`. For a new pair, type `positive` / `negative` (and optionally
-   `label` and the strengths), then click **💾 Save to library**.
-4. Next time — in any workflow — just pick the same pair and the saved prompt / strengths / label
-   **auto-fill**. Tweak in place; press 💾 again to update the entry.
+1. Right-click the canvas → **Add Node → presets → Preset Selector 10** (or double-click and search).
+2. Connect **MODEL** and **CLIP** (from your checkpoint loader).
+3. In any slot, pick `high_lora` + `low_lora`. For a new pair, type the prompts (and a name), then
+   click **💾 Save all slots to library**.
+4. Next time — in any workflow — set a slot to the same pair and its saved prompt / strengths / name
+   **auto-fill**. Tweak in place; press 💾 again to update. Use `preset_index` (with
+   *Control After Generate = increment*) to cycle through the 10 slots as before.
 
 **Notes & troubleshooting**
 - The LoRA dropdowns are read at ComfyUI startup — after adding files to `models/loras`, restart to see them.
